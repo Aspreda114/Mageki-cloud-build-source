@@ -1,0 +1,55 @@
+name: Build unsigned iOS IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Legacy Xamarin tools are Intel binaries. Do not change to macos-latest.
+    runs-on: macos-15-large
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install the SDK used by Mono MSBuild
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '5.0.214'
+
+      - name: Install Mono and Xamarin.iOS
+        run: bash scripts/setup-ios-ci.sh
+
+      - name: Build and verify an unsigned ARM64 IPA
+        run: bash scripts/build-ios-unsigned.sh
+
+      - name: Upload IPA and signing notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mageki-iOS-unsigned
+          path: |
+            artifacts/*.ipa
+            artifacts/*.sha256
+            artifacts/Entitlements.plist
+            artifacts/INSTALL.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mageki-iOS-build-logs
+          path: |
+            artifacts/*.log
+            artifacts/*.binlog
+          if-no-files-found: ignore
+          retention-days: 14
